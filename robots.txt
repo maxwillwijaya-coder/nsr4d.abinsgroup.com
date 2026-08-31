@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://nsr4d.abinsgroup.com/sitemap.xml
