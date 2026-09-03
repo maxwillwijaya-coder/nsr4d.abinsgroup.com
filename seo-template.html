@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>SEO Template Injektor & Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-6">
+  <div class="max-w-4xl mx-auto space-y-6">
+    <header class="border-b border-slate-700 pb-4">
+      <h1 class="text-2xl font-bold text-sky-400">SEO Automation Injektor</h1>
+      <p class="text-sm text-slate-400">Upload template, generate metadata SEO dengan AI, review, lalu unduh hasilnya.</p>
+    </header>
+
+    <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 space-y-4">
+      <h2 class="font-semibold text-lg text-sky-300">1. Konfigurasi & Template</h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium mb-1 text-slate-300">Google Gemini API Key</label>
+          <input type="password" id="apiKey" placeholder="AIzaSy..." class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm focus:border-sky-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-medium mb-1 text-slate-300">Nama Brand / Produk</label>
+          <input type="text" id="brandName" placeholder="Contoh: Toko Kopi Senja" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm focus:border-sky-500 outline-none">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium mb-1 text-slate-300">Upload Template (.html / .txt)</label>
+        <input type="file" id="fileInput" accept=".html,.txt" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm text-slate-400">
+      </div>
+
+      <button onclick="generateSEO()" id="btnGenerate" class="w-full bg-sky-600 hover:bg-sky-500 font-medium py-2 rounded text-sm transition">
+        Generate SEO Assets
+      </button>
+    </div>
+
+    <div id="reviewSection" class="hidden bg-slate-800 p-5 rounded-xl border border-slate-700 space-y-4">
+      <h2 class="font-semibold text-lg text-sky-300">2. Review & Revisi Hasil</h2>
+      
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium mb-1 text-slate-300">Meta Title</label>
+          <input type="text" id="outTitle" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium mb-1 text-slate-300">Meta Description</label>
+          <textarea id="outDesc" rows="2" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium mb-1 text-slate-300">Schema.org (Breadcrumb & FAQPage JSON-LD)</label>
+          <textarea id="outSchema" rows="5" class="w-full font-mono bg-slate-950 border border-slate-700 rounded p-2 text-xs"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium mb-1 text-slate-300">Artikel SEO (Format HTML)</label>
+          <textarea id="outArticle" rows="6" class="w-full font-mono bg-slate-950 border border-slate-700 rounded p-2 text-xs"></textarea>
+        </div>
+      </div>
+
+      <button onclick="injectAndPrepareDownload()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-medium py-2 rounded text-sm transition">
+        Terapkan ke Template & Buat File Baru
+      </button>
+    </div>
+
+    <div id="downloadSection" class="hidden bg-slate-800 p-5 rounded-xl border border-slate-700 space-y-4">
+      <h2 class="font-semibold text-lg text-emerald-400">3. Template Baru Siap Digunakan</h2>
+      <p class="text-xs text-slate-300">Data telah disuntikkan ke dalam tag <code>&lt;head&gt;</code> dan bagian artikel template.</p>
+      
+      <textarea id="finalHtmlPreview" rows="8" readonly class="w-full font-mono bg-slate-950 border border-slate-700 rounded p-2 text-xs text-slate-400"></textarea>
+
+      <button onclick="downloadFile()" class="w-full bg-indigo-600 hover:bg-indigo-500 font-medium py-2 rounded text-sm transition">
+        Unduh File (.html)
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let rawTemplate = "";
+
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => { rawTemplate = event.target.result; };
+      reader.readAsText(file);
+    });
+
+    async function generateSEO() {
+      const apiKey = document.getElementById('apiKey').value.trim();
+      const brand = document.getElementById('brandName').value.trim();
+      const btn = document.getElementById('btnGenerate');
+
+      if (!apiKey || !brand) {
+        alert("Harap isi API Key dan Nama Brand!");
+        return;
+      }
+      if (!rawTemplate) {
+        alert("Harap upload file template terlebih dahulu!");
+        return;
+      }
+
+      btn.innerText = "Sedang generate...";
+      btn.disabled = true;
+
+      const prompt = `Anda adalah pakar SEO profesional. Buat paket SEO lengkap untuk brand "${brand}".
+Format respon HARUS murni JSON valid tanpa backtick markdown (no \`\`\`json) dengan struktur berikut:
+{
+  "title": "Title tag SEO (maksimal 60 karakter)",
+  "description": "Meta description persuasif (maksimal 155 karakter)",
+  "schema": {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://example.com/"},
+          {"@type": "ListItem", "position": 2, "name": "${brand}", "item": "https://example.com/${encodeURIComponent(brand)}"}
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {"@type": "Question", "name": "Apa itu ${brand}?", "acceptedAnswer": {"@type": "Answer", "text": "Jawaban ringkas tentang ${brand}"}},
+          {"@type": "Question", "name": "Layanan apa yang disediakan oleh ${brand}?", "acceptedAnswer": {"@type": "Answer", "text": "Detail ringkas layanan ${brand}"}}
+        ]
+      }
+    ]
+  },
+  "article": "<article><h1>${brand}</h1><p>Paragraf pembuka artikel relevan.</p><h2>Keunggulan</h2><p>Penjelasan keunggulan.</p></article>"
+}`;
+
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: "application/json" }
+          })
+        });
+
+        const data = await response.json();
+        const content = JSON.parse(data.candidates[0].content.parts[0].text);
+
+        document.getElementById('outTitle').value = content.title;
+        document.getElementById('outDesc').value = content.description;
+        document.getElementById('outSchema').value = JSON.stringify(content.schema, null, 2);
+        document.getElementById('outArticle').value = content.article;
+
+        document.getElementById('reviewSection').classList.remove('hidden');
+      } catch (err) {
+        alert("Gagal memproses AI: " + err.message);
+      } finally {
+        btn.innerText = "Generate SEO Assets";
+        btn.disabled = false;
+      }
+    }
+
+    function injectAndPrepareDownload() {
+      const title = document.getElementById('outTitle').value;
+      const desc = document.getElementById('outDesc').value;
+      const schema = document.getElementById('outSchema').value;
+      const article = document.getElementById('outArticle').value;
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(rawTemplate, 'text/html');
+
+      // 1. Injeksi Title
+      doc.title = title;
+
+      // 2. Injeksi Meta Description
+      let metaDesc = doc.querySelector('meta[name="description"]');
+      if (!metaDesc) {
+        metaDesc = doc.createElement('meta');
+        metaDesc.setAttribute('name', 'description');
+        doc.head.appendChild(metaDesc);
+      }
+      metaDesc.setAttribute('content', desc);
+
+      // 3. Injeksi Schema JSON-LD
+      let schemaTag = doc.querySelector('script[data-seo-schema="true"]');
+      if (!schemaTag) {
+        schemaTag = doc.createElement('script');
+        schemaTag.type = 'application/ld+json';
+        schemaTag.setAttribute('data-seo-schema', 'true');
+        doc.head.appendChild(schemaTag);
+      }
+      schemaTag.textContent = schema;
+
+      // 4. Injeksi Artikel
+      // Target prioritas: elemen id="seo-article", tag <main>, atau sebelum </body>
+      const articleTarget = doc.getElementById('seo-article') || doc.querySelector('main') || doc.body;
+      const tempDiv = doc.createElement('div');
+      tempDiv.innerHTML = article;
+      articleTarget.appendChild(tempDiv);
+
+      const finalHtml = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
+      document.getElementById('finalHtmlPreview').value = finalHtml;
+      document.getElementById('downloadSection').classList.remove('hidden');
+    }
+
+    function downloadFile() {
+      const content = document.getElementById('finalHtmlPreview').value;
+      const blob = new Blob([content], { type: 'text/html;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `seo_ready_${Date.now()}.html`;
+      link.click();
+    }
+  </script>
+</body>
+</html>
